@@ -75,6 +75,10 @@ def cmd_scan(args):
             repo_url=getattr(args, "repo_url", None),
             commit_sha=getattr(args, "commit_sha", None),
             diff_manifest=getattr(args, "diff_manifest", None),
+            llm_reachability=getattr(args, "llm_reachability", False),
+            llm_reachability_max_code_bytes=getattr(
+                args, "llm_reachability_max_code_bytes", 1500
+            ),
         )
 
         scan_payload = result.to_dict()
@@ -988,6 +992,29 @@ def main():
     scan_p.add_argument("--backoff", type=int, default=30,
                         help="Seconds to wait when rate-limited (default: 30)")
     scan_p.add_argument("--diff-manifest", help="Path to diff_manifest.json for incremental scanning")
+    scan_p.add_argument(
+        "--llm-reachability",
+        action="store_true",
+        dest="llm_reachability",
+        help="Enable the LLM reachability review stage (Opus). "
+             "Surfaces entry points and external-input sites the structural "
+             "pass would miss by reviewing the full codebase before the "
+             "reachability filter is applied. Off by default — enabling "
+             "this incurs cost proportional to total repo size, not the "
+             "filtered unit count (~one Opus call per 25 units across the "
+             "whole codebase).",
+    )
+    scan_p.add_argument(
+        "--llm-reachability-max-code-bytes",
+        type=int,
+        default=1500,
+        dest="llm_reachability_max_code_bytes",
+        help="Max code bytes per unit sent to the LLM reachability stage "
+             "(default: 1500). Higher values (e.g. 4096, 8192) catch "
+             "entry-point indicators past byte 1500 in long handlers / "
+             "generated code, at proportional Opus cost increase. Only "
+             "meaningful with --llm-reachability.",
+    )
     scan_p.set_defaults(func=cmd_scan)
 
     # ---------------------------------------------------------------
