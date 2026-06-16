@@ -25,6 +25,12 @@ from dotenv import load_dotenv
 
 from .rate_limiter import get_rate_limiter
 
+# Bedrock model ID mapping
+BEDROCK_MODEL_MAP = {
+    "claude-opus-4-20250514": "anthropic.claude-opus-4-20250514-v1:0",
+    "claude-sonnet-4-20250514": "anthropic.claude-sonnet-4-20250514-v1:0",
+}
+
 
 # Pricing per million tokens (as of December 2024)
 MODEL_PRICING = {
@@ -200,12 +206,27 @@ class AnthropicClient:
         """
         load_dotenv()
 
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY not found in environment")
+        self.use_bedrock = os.getenv("USE_BEDROCK") == "1"
+        self.use_vertex = os.getenv("USE_VERTEX") == "1"
 
-        self.client = anthropic.Anthropic(api_key=api_key, max_retries=5)
-        self.model = model
+        if self.use_bedrock:
+            self.client = anthropic.AnthropicBedrock(
+                aws_region=os.getenv("AWS_REGION", "eu-west-1"),
+            )
+            self.model = BEDROCK_MODEL_MAP.get(model, model)
+        elif self.use_vertex:
+            self.client = anthropic.AnthropicVertex(
+                region=os.getenv("VERTEX_REGION", "us-east5"),
+                project_id=os.getenv("VERTEX_PROJECT_ID"),
+            )
+            self.model = model
+        else:
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                raise ValueError("ANTHROPIC_API_KEY not found in environment")
+            self.client = anthropic.Anthropic(api_key=api_key, max_retries=5)
+            self.model = model
+
         self.tracker = tracker or _global_tracker
         self.last_call = None  # Store last call details
 
