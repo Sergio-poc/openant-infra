@@ -1,26 +1,26 @@
 {
   "step": "verify",
   "status": "success",
-  "timestamp": "2026-06-17T08:25:33.804745Z",
-  "duration_seconds": 0.0,
-  "cost_usd": 0.0,
+  "timestamp": "2026-06-17T11:51:23.145587Z",
+  "duration_seconds": 26.21,
+  "cost_usd": 0.048054,
   "token_usage": {
-    "input_tokens": 0,
-    "output_tokens": 0,
-    "total_tokens": 0
+    "input_tokens": 9468,
+    "output_tokens": 1310,
+    "total_tokens": 10778
   },
   "summary": {
-    "findings_input": 0,
-    "findings_verified": 0,
+    "findings_input": 1,
+    "findings_verified": 1,
     "agreed": 0,
-    "disagreed": 0,
+    "disagreed": 1,
     "confirmed_vulnerabilities": 0
   },
   "inputs": {
-    "results_path": "/work/output/dataset.json",
+    "results_path": "/work/output/results.json",
     "analyzer_output_path": "/work/output/analyzer_output.json",
     "app_context_path": null,
-    "repo_path": null
+    "repo_path": "/work/input"
   },
   "outputs": {
     "verified_results_path": "/work/output/results_verified.json"

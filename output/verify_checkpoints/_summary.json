@@ -1,0 +1,14 @@
+{
+  "step": "Verify",
+  "phase": "done",
+  "timestamp": "2026-06-17T11:51:49.351175Z",
+  "total_units": 1,
+  "completed": 1,
+  "errors": 0,
+  "error_breakdown": {},
+  "usage": {
+    "input_tokens": 9468,
+    "output_tokens": 1310,
+    "cost_usd": 0.048054
+  }
+}
