@@ -69,6 +69,10 @@ data "aws_iam_policy_document" "task" {
     resources = ["*"]
   }
   statement {
+    actions   = ["bedrock:GetInferenceProfile", "bedrock:ListInferenceProfiles"]
+    resources = ["*"]
+  }
+  statement {
     actions   = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
     resources = [aws_s3_bucket.data.arn, "${aws_s3_bucket.data.arn}/*"]
   }
