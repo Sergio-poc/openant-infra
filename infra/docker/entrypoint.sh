@@ -27,9 +27,16 @@ if [ "$STAGE" != "parse" ]; then
 fi
 
 # 3. Run the step
+mkdir -p /work/output
 echo "==> Running: python -m openant ${STAGE} (model=${MODEL_ID})"
 cd /app
-python -m openant "$STAGE" /work/input --output /work/output --model "$MODEL_ID" || true
+if [ "$STAGE" = "parse" ]; then
+  STEP_INPUT="/work/input"
+  MODEL_ID="$MODEL_ID" python -m openant "$STAGE" "$STEP_INPUT" --output /work/output --level all || true
+else
+  STEP_INPUT="/work/output/dataset.json"
+  MODEL_ID="$MODEL_ID" python -m openant "$STAGE" "$STEP_INPUT" --output /work/output/dataset.json --analyzer-output /work/output/analyzer_output.json || true
+fi
 
 # 4. Upload outputs
 echo "==> Uploading results to s3://${S3_BUCKET}/${S3_PREFIX}/"
