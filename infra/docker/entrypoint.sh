@@ -30,13 +30,26 @@ fi
 mkdir -p /work/output
 echo "==> Running: python -m openant ${STAGE} (model=${MODEL_ID})"
 cd /app
-if [ "$STAGE" = "parse" ]; then
-  STEP_INPUT="/work/input"
-  MODEL_ID="$MODEL_ID" python -m openant "$STAGE" "$STEP_INPUT" --output /work/output --level all || true
-else
-  STEP_INPUT="/work/output/dataset.json"
-  MODEL_ID="$MODEL_ID" python -m openant "$STAGE" "$STEP_INPUT" --output /work/output/dataset.json --analyzer-output /work/output/analyzer_output.json || true
-fi
+case "$STAGE" in
+  parse)
+    MODEL_ID="$MODEL_ID" python -m openant parse /work/input --output /work/output --level all || true
+    ;;
+  enhance)
+    MODEL_ID="$MODEL_ID" python -m openant enhance /work/output/dataset.json --output /work/output --analyzer-output /work/output/analyzer_output.json || true
+    ;;
+  analyze)
+    MODEL_ID="$MODEL_ID" python -m openant analyze /work/output/dataset.json --output /work/output --analyzer-output /work/output/analyzer_output.json || true
+    ;;
+  verify)
+    MODEL_ID="$MODEL_ID" python -m openant verify /work/output/results.json --output /work/output --analyzer-output /work/output/analyzer_output.json --repo-path /work/input || true
+    ;;
+  build-output)
+    MODEL_ID="$MODEL_ID" python -m openant build-output /work/output/results_verified.json --output /work/output/pipeline_output.json --repo-name "${PROJECT_PATH}" || true
+    ;;
+  *)
+    echo "Unknown stage: $STAGE" && exit 1
+    ;;
+esac
 
 # 4. Upload outputs
 echo "==> Uploading results to s3://${S3_BUCKET}/${S3_PREFIX}/"

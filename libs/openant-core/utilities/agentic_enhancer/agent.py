@@ -30,8 +30,8 @@ from .reachability_analyzer import ReachabilityAnalyzer
 # Use Sonnet for exploration (cost-effective)
 AGENT_MODEL = "claude-sonnet-4-20250514"
 BEDROCK_MODEL_MAP = {
-    "claude-sonnet-4-20250514": "eu.anthropic.claude-sonnet-4-20250514-v1:0",
-    "claude-opus-4-20250514": "eu.anthropic.claude-opus-4-20250514-v1:0",
+    "claude-sonnet-4-20250514": "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "claude-opus-4-20250514": "eu.anthropic.claude-opus-4-5-20251101-v1:0",
 }
 
 # Safety limits

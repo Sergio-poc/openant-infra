@@ -30,6 +30,7 @@ Classes:
 
 import json
 import logging
+import os
 import re
 import sys
 import threading
@@ -63,6 +64,17 @@ except ImportError:
 
 
 VERIFIER_MODEL = "claude-opus-4-6"
+_BEDROCK_MODEL_MAP = {
+    "claude-opus-4-6": "eu.anthropic.claude-opus-4-5-20251101-v1:0",
+    "claude-sonnet-4-20250514": "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
+}
+
+def _resolve_model(model: str) -> str:
+    if os.getenv("USE_BEDROCK") == "1":
+        return _BEDROCK_MODEL_MAP.get(model, model)
+    return model
+
+RESOLVED_MODEL = _resolve_model(VERIFIER_MODEL)
 MAX_ITERATIONS = 20
 MAX_TOKENS_PER_RESPONSE = 4096
 
@@ -271,7 +283,11 @@ class FindingVerifier:
         self.verbose = verbose
         self.app_context = app_context
         self.tool_executor = ToolExecutor(index)
-        self.client = client or anthropic.Anthropic(max_retries=5)
+        self.client = client or (
+            anthropic.AnthropicBedrock(aws_region=os.getenv("AWS_REGION", "eu-west-1"))
+            if os.getenv("USE_BEDROCK") == "1"
+            else anthropic.Anthropic(max_retries=5)
+        )
         self.logger = logger or _null_logger
         self._use_logger = logger is not None
 
@@ -334,7 +350,7 @@ class FindingVerifier:
 
             try:
                 response = self.client.messages.create(
-                    model=VERIFIER_MODEL,
+                    model=RESOLVED_MODEL,
                     max_tokens=MAX_TOKENS_PER_RESPONSE,
                     system=system_prompt,
                     tools=VERIFICATION_TOOLS,
@@ -400,7 +416,7 @@ class FindingVerifier:
 
             if finish_result:
                 self.tracker.record_call(
-                    model=VERIFIER_MODEL,
+                    model=RESOLVED_MODEL,
                     input_tokens=total_input_tokens,
                     output_tokens=total_output_tokens
                 )
@@ -414,7 +430,7 @@ class FindingVerifier:
 
         # Max iterations reached
         self.tracker.record_call(
-            model=VERIFIER_MODEL,
+            model=RESOLVED_MODEL,
             input_tokens=total_input_tokens,
             output_tokens=total_output_tokens
         )
@@ -835,14 +851,14 @@ class FindingVerifier:
             rate_limiter.wait_if_needed()
 
             response = self.client.messages.create(
-                model=VERIFIER_MODEL,
+                model=RESOLVED_MODEL,
                 max_tokens=MAX_TOKENS_PER_RESPONSE,
                 system="You are checking verdict consistency across similar code patterns.",
                 messages=[{"role": "user", "content": prompt}]
             )
 
             self.tracker.record_call(
-                model=VERIFIER_MODEL,
+                model=RESOLVED_MODEL,
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens
             )
@@ -913,7 +929,7 @@ class FindingVerifier:
                 result = self._parse_json_from_text(block.text)
                 if result:
                     self.tracker.record_call(
-                        model=VERIFIER_MODEL,
+                        model=RESOLVED_MODEL,
                         input_tokens=total_input_tokens,
                         output_tokens=total_output_tokens
                     )
