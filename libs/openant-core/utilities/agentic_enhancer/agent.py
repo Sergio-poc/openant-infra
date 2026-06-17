@@ -14,6 +14,8 @@ Supports reachability-aware classification to distinguish:
 import json
 from typing import Optional, Set, List
 
+import os
+
 import anthropic
 
 from ..llm_client import TokenTracker, get_global_tracker
@@ -27,6 +29,10 @@ from .reachability_analyzer import ReachabilityAnalyzer
 
 # Use Sonnet for exploration (cost-effective)
 AGENT_MODEL = "claude-sonnet-4-20250514"
+BEDROCK_MODEL_MAP = {
+    "claude-sonnet-4-20250514": "eu.anthropic.claude-sonnet-4-20250514-v1:0",
+    "claude-opus-4-20250514": "eu.anthropic.claude-opus-4-20250514-v1:0",
+}
 
 # Safety limits
 MAX_ITERATIONS = 20
@@ -126,7 +132,11 @@ class ContextAgent:
         self.tool_executor = ToolExecutor(index)
         self.entry_points = entry_points or set()
         self.reachability = reachability
-        self.client = client or anthropic.Anthropic(max_retries=5)
+        self.client = client or (
+            anthropic.AnthropicBedrock(aws_region=os.getenv("AWS_REGION", "eu-west-1"))
+            if os.getenv("USE_BEDROCK") == "1"
+            else anthropic.Anthropic(max_retries=5)
+        )
 
     def analyze_unit(
         self,
@@ -193,8 +203,9 @@ class ContextAgent:
                 rate_limiter = get_rate_limiter()
                 rate_limiter.wait_if_needed()
 
+                _model = BEDROCK_MODEL_MAP.get(AGENT_MODEL, AGENT_MODEL) if os.getenv("USE_BEDROCK") == "1" else AGENT_MODEL
                 response = self.client.messages.create(
-                    model=AGENT_MODEL,
+                    model=_model,
                     max_tokens=MAX_TOKENS_PER_RESPONSE,
                     system=SYSTEM_PROMPT,
                     tools=TOOL_DEFINITIONS,

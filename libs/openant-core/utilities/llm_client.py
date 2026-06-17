@@ -27,8 +27,8 @@ from .rate_limiter import get_rate_limiter
 
 # Bedrock model ID mapping
 BEDROCK_MODEL_MAP = {
-    "claude-opus-4-20250514": "anthropic.claude-opus-4-20250514-v1:0",
-    "claude-sonnet-4-20250514": "anthropic.claude-sonnet-4-20250514-v1:0",
+    "claude-opus-4-20250514": "eu.anthropic.claude-opus-4-20250514-v1:0",
+    "claude-sonnet-4-20250514": "eu.anthropic.claude-sonnet-4-20250514-v1:0",
 }
 
 

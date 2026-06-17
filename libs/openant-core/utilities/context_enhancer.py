@@ -584,7 +584,12 @@ class ContextEnhancer:
         # which spawns a new httpx connection pool. With 1000+ units and 8 workers,
         # this exhausted file descriptors (macOS limit ~256). The httpx.Client
         # underlying anthropic.Anthropic is thread-safe, so sharing is correct.
-        shared_client = anthropic.Anthropic(max_retries=5)
+        if os.getenv("USE_BEDROCK") == "1":
+            shared_client = anthropic.AnthropicBedrock(
+                aws_region=os.getenv("AWS_REGION", "eu-west-1"),
+            )
+        else:
+            shared_client = anthropic.Anthropic(max_retries=5)
 
         # Filter to unprocessed units
         units_to_process = [(i, unit) for i, unit in enumerate(units) if unit.get("id") not in processed_ids]
