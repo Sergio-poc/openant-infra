@@ -1,0 +1,67 @@
+{
+  "repository": "/work/input",
+  "functions": {
+    "vuln.c:check_password": {
+      "name": "check_password",
+      "file_path": "vuln.c",
+      "start_line": 4,
+      "end_line": 15,
+      "code": "void check_password(const char *input) {\n    int authenticated = 0;\n    char buffer[16];\n\n    strcpy(buffer, input);\n\n    if (authenticated) {\n        printf(\"Access granted!\\n\");\n    } else {\n        printf(\"Access denied.\\n\");\n    }\n}",
+      "parameters": [
+        "const char *input"
+      ],
+      "return_type": "void",
+      "is_static": false,
+      "is_exported": true,
+      "is_inline": false,
+      "unit_type": "function",
+      "class_name": null
+    },
+    "vuln.c:main": {
+      "name": "main",
+      "file_path": "vuln.c",
+      "start_line": 17,
+      "end_line": 24,
+      "code": "int main(int argc, char *argv[]) {\n    if (argc < 2) {\n        printf(\"Usage: %s <password>\\n\", argv[0]);\n        return 1;\n    }\n    check_password(argv[1]);\n    return 0;\n}",
+      "parameters": [
+        "int argc",
+        "char *argv[]"
+      ],
+      "return_type": "int",
+      "is_static": false,
+      "is_exported": true,
+      "is_inline": false,
+      "unit_type": "main",
+      "class_name": null
+    }
+  },
+  "includes": {
+    "vuln.c": [
+      "stdio.h",
+      "string.h"
+    ]
+  },
+  "macros": {},
+  "macro_aliases": {},
+  "prototypes": {},
+  "call_graph": {
+    "vuln.c:check_password": [],
+    "vuln.c:main": [
+      "vuln.c:check_password"
+    ]
+  },
+  "reverse_call_graph": {
+    "vuln.c:check_password": [
+      "vuln.c:main"
+    ]
+  },
+  "statistics": {
+    "total_functions": 2,
+    "total_edges": 1,
+    "avg_out_degree": 0.5,
+    "avg_in_degree": 0.5,
+    "max_out_degree": 1,
+    "max_in_degree": 1,
+    "isolated_functions": 0
+  }
+}

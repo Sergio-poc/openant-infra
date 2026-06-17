@@ -1,0 +1,29 @@
+{
+  "step": "verify",
+  "status": "success",
+  "timestamp": "2026-06-17T08:25:33.804745Z",
+  "duration_seconds": 0.0,
+  "cost_usd": 0.0,
+  "token_usage": {
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0
+  },
+  "summary": {
+    "findings_input": 0,
+    "findings_verified": 0,
+    "agreed": 0,
+    "disagreed": 0,
+    "confirmed_vulnerabilities": 0
+  },
+  "inputs": {
+    "results_path": "/work/output/dataset.json",
+    "analyzer_output_path": "/work/output/analyzer_output.json",
+    "app_context_path": null,
+    "repo_path": null
+  },
+  "outputs": {
+    "verified_results_path": "/work/output/results_verified.json"
+  },
+  "errors": []
+}

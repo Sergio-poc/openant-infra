@@ -1,0 +1,18 @@
+{
+  "repository": "/work/input",
+  "scan_time": "2026-06-17T07:22:12.034939",
+  "files": [
+    {
+      "path": "vuln.c",
+      "size": 453,
+      "extension": ".c"
+    }
+  ],
+  "statistics": {
+    "total_files": 1,
+    "total_size_bytes": 453,
+    "directories_scanned": 9,
+    "directories_excluded": 0,
+    "test_files_skipped": 0
+  }
+}

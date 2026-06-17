@@ -1,0 +1,47 @@
+{
+  "repository": "/work/input",
+  "functions": {
+    "vuln.c:check_password": {
+      "name": "check_password",
+      "unitType": "function",
+      "code": "void check_password(const char *input) {\n    int authenticated = 0;\n    char buffer[16];\n\n    strcpy(buffer, input);\n\n    if (authenticated) {\n        printf(\"Access granted!\\n\");\n    } else {\n        printf(\"Access denied.\\n\");\n    }\n}",
+      "filePath": "vuln.c",
+      "startLine": 4,
+      "endLine": 15,
+      "isStatic": false,
+      "isExported": true,
+      "returnType": "void",
+      "parameters": [
+        "const char *input"
+      ],
+      "className": null
+    },
+    "vuln.c:main": {
+      "name": "main",
+      "unitType": "main",
+      "code": "int main(int argc, char *argv[]) {\n    if (argc < 2) {\n        printf(\"Usage: %s <password>\\n\", argv[0]);\n        return 1;\n    }\n    check_password(argv[1]);\n    return 0;\n}",
+      "filePath": "vuln.c",
+      "startLine": 17,
+      "endLine": 24,
+      "isStatic": false,
+      "isExported": true,
+      "returnType": "int",
+      "parameters": [
+        "int argc",
+        "char *argv[]"
+      ],
+      "className": null
+    }
+  },
+  "call_graph": {
+    "vuln.c:check_password": [],
+    "vuln.c:main": [
+      "vuln.c:check_password"
+    ]
+  },
+  "reverse_call_graph": {
+    "vuln.c:check_password": [
+      "vuln.c:main"
+    ]
+  }
+}

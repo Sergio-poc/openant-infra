@@ -1,0 +1,33 @@
+{
+  "result": {
+    "function_analyzed": "int main(int argc, char *argv[])",
+    "finding": "safe",
+    "reasoning": "The main function only validates argc >= 2, prints usage with a literal format string, and forwards argv[1] (a pointer) to check_password(). It performs no buffer copies, no unbounded operations, and no format-string misuse on attacker input. The actual stack buffer overflow (strcpy into a 16-byte buffer) resides in check_password(), which is outside the target scope. Forwarding a pointer is normal, intended behavior and not itself a vulnerability within main's code.",
+    "attack_vector": null,
+    "confidence": 0.85,
+    "cwe_id": 0,
+    "cwe_name": null,
+    "verdict": "SAFE",
+    "route_key": "vuln.c:main",
+    "elapsed_seconds": 10.702058,
+    "prompt_length": 2898,
+    "response_length": 2248,
+    "code_length": 946,
+    "files_included": [
+      "vuln.c"
+    ],
+    "has_deps_inlined": true,
+    "context_reviewed": false,
+    "security_classification": "exploitable",
+    "classification_reasoning": null,
+    "unit_id": "vuln.c:main"
+  },
+  "route_key": "vuln.c:main",
+  "code_for_route": "int main(int argc, char *argv[]) {\n    if (argc < 2) {\n        printf(\"Usage: %s <password>\\n\", argv[0]);\n        return 1;\n    }\n    check_password(argv[1]);\n    return 0;\n}\n\n// ========== File Boundary ==========\n\nvoid check_password(const char *input) {\n    int authenticated = 0;\n    char buffer[16];\n\n    strcpy(buffer, input);\n\n    if (authenticated) {\n        printf(\"Access granted!\\n\");\n    } else {\n        printf(\"Access denied.\\n\");\n    }\n}\n\n// ========== File Boundary ==========\n\nint main(int argc, char *argv[]) {\n    if (argc < 2) {\n        printf(\"Usage: %s <password>\\n\", argv[0]);\n        return 1;\n    }\n    check_password(argv[1]);\n    return 0;\n}\n\n// ========== File Boundary ==========\n\nvoid check_password(const char *input) {\n    int authenticated = 0;\n    char buffer[16];\n\n    strcpy(buffer, input);\n\n    if (authenticated) {\n        printf(\"Access granted!\\n\");\n    } else {\n        printf(\"Access denied.\\n\");\n    }\n}",
+  "usage": {
+    "input_tokens": 1304,
+    "output_tokens": 828,
+    "cost_usd": 0.016332
+  },
+  "id": "vuln.c:main"
+}

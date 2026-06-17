@@ -1,0 +1,34 @@
+{
+  "step": "analyze",
+  "status": "success",
+  "timestamp": "2026-06-17T08:23:45.009550Z",
+  "duration_seconds": 14.05,
+  "cost_usd": 0.0372,
+  "token_usage": {
+    "input_tokens": 2610,
+    "output_tokens": 1958,
+    "total_tokens": 4568
+  },
+  "summary": {
+    "total_units": 2,
+    "analyzed": 2,
+    "verdicts": {
+      "vulnerable": 1,
+      "bypassable": 0,
+      "inconclusive": 0,
+      "protected": 0,
+      "safe": 1,
+      "errors": 0
+    }
+  },
+  "inputs": {
+    "dataset_path": "/work/output/dataset.json",
+    "model": "opus",
+    "exploitable_filter": null,
+    "limit": null
+  },
+  "outputs": {
+    "results_path": "/work/output/results.json"
+  },
+  "errors": []
+}

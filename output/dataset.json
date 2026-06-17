@@ -1,0 +1,199 @@
+{
+  "name": "input",
+  "repository": "/work/input",
+  "units": [
+    {
+      "id": "vuln.c:check_password",
+      "unit_type": "function",
+      "code": {
+        "primary_code": "void check_password(const char *input) {\n    int authenticated = 0;\n    char buffer[16];\n\n    strcpy(buffer, input);\n\n    if (authenticated) {\n        printf(\"Access granted!\\n\");\n    } else {\n        printf(\"Access denied.\\n\");\n    }\n}\n\n// ========== File Boundary ==========\n\nint main(int argc, char *argv[]) {\n    if (argc < 2) {\n        printf(\"Usage: %s <password>\\n\", argv[0]);\n        return 1;\n    }\n    check_password(argv[1]);\n    return 0;\n}\n\n// ========== File Boundary ==========\n\nvoid check_password(const char *input) {\n    int authenticated = 0;\n    char buffer[16];\n\n    strcpy(buffer, input);\n\n    if (authenticated) {\n        printf(\"Access granted!\\n\");\n    } else {\n        printf(\"Access denied.\\n\");\n    }\n}\n\n// ========== File Boundary ==========\n\nint main(int argc, char *argv[]) {\n    if (argc < 2) {\n        printf(\"Usage: %s <password>\\n\", argv[0]);\n        return 1;\n    }\n    check_password(argv[1]);\n    return 0;\n}",
+        "primary_origin": {
+          "file_path": "vuln.c",
+          "start_line": 4,
+          "end_line": 15,
+          "function_name": "check_password",
+          "class_name": null,
+          "deps_inlined": true,
+          "files_included": [
+            "vuln.c"
+          ],
+          "original_length": 236,
+          "enhanced_length": 946
+        },
+        "dependencies": [],
+        "dependency_metadata": {
+          "depth": 3,
+          "total_upstream": 0,
+          "total_downstream": 1,
+          "direct_calls": 0,
+          "direct_callers": 1
+        }
+      },
+      "ground_truth": {
+        "status": "UNKNOWN",
+        "vulnerability_types": [],
+        "issues": [],
+        "annotation_source": null,
+        "annotation_key": null,
+        "notes": null
+      },
+      "metadata": {
+        "is_static": false,
+        "is_exported": true,
+        "return_type": "void",
+        "parameters": [
+          "const char *input"
+        ],
+        "generator": "c_unit_generator.py",
+        "direct_calls": [],
+        "direct_callers": [
+          "vuln.c:main"
+        ]
+      },
+      "agent_context": {
+        "include_functions": [
+          {
+            "id": "vuln.c:check_password",
+            "reason": "Contains the vulnerable strcpy operation that performs unbounded copy into fixed buffer"
+          },
+          {
+            "id": "vuln.c:main",
+            "reason": "Entry point that receives user input (CLI arguments) and passes it unsanitized to check_password"
+          }
+        ],
+        "usage_context": "The check_password function is a password verification routine called directly from main() with command-line arguments. The function uses strcpy to copy user-provided input into a fixed-size 16-byte buffer without any bounds checking. The user input comes from argv[1] (CLI argument) and flows directly into the vulnerable strcpy call, making this a classic buffer overflow vulnerability that is reachable from user-controlled input.",
+        "security_classification": "exploitable",
+        "classification_reasoning": "This code is EXPLOITABLE because:\n\n1. **Dangerous Operation Present**: The function uses strcpy(buffer, input) which is an unsafe C function that copies data without bounds checking into a 16-byte fixed buffer.\n\n2. **User Input Reachability**: There is a clear path from user-controlled input to the dangerous operation:\n   - Entry point: main() receives command-line arguments (argc, argv)\n   - Direct call: main() calls check_password(argv[1]) with no sanitization\n   - Exploitation: argv[1] is passed directly to strcpy without length validation\n\n3. **No Security Controls**: There is no input validation, length checking, or use of safe alternatives (strncpy, strlcpy, etc.) before the strcpy operation.\n\n4. **Real-world Exploitability**: An attacker can provide a command-line argument longer than 16 bytes to overflow the buffer, potentially overwriting stack data including the return address, leading to arbitrary code execution.\n\nThis is a textbook example of a remotely/locally exploitable buffer overflow vulnerability via command-line input.",
+        "confidence": 1.0,
+        "agent_metadata": {
+          "iterations": 1,
+          "total_tokens": 3345,
+          "input_tokens": 2371,
+          "output_tokens": 974,
+          "cost_usd": 0.021723
+        },
+        "reachability": {
+          "is_entry_point": false,
+          "reachable_from_entry": null,
+          "entry_point_path": null
+        }
+      }
+    },
+    {
+      "id": "vuln.c:main",
+      "unit_type": "main",
+      "code": {
+        "primary_code": "int main(int argc, char *argv[]) {\n    if (argc < 2) {\n        printf(\"Usage: %s <password>\\n\", argv[0]);\n        return 1;\n    }\n    check_password(argv[1]);\n    return 0;\n}\n\n// ========== File Boundary ==========\n\nvoid check_password(const char *input) {\n    int authenticated = 0;\n    char buffer[16];\n\n    strcpy(buffer, input);\n\n    if (authenticated) {\n        printf(\"Access granted!\\n\");\n    } else {\n        printf(\"Access denied.\\n\");\n    }\n}\n\n// ========== File Boundary ==========\n\nint main(int argc, char *argv[]) {\n    if (argc < 2) {\n        printf(\"Usage: %s <password>\\n\", argv[0]);\n        return 1;\n    }\n    check_password(argv[1]);\n    return 0;\n}\n\n// ========== File Boundary ==========\n\nvoid check_password(const char *input) {\n    int authenticated = 0;\n    char buffer[16];\n\n    strcpy(buffer, input);\n\n    if (authenticated) {\n        printf(\"Access granted!\\n\");\n    } else {\n        printf(\"Access denied.\\n\");\n    }\n}",
+        "primary_origin": {
+          "file_path": "vuln.c",
+          "start_line": 17,
+          "end_line": 24,
+          "function_name": "main",
+          "class_name": null,
+          "deps_inlined": true,
+          "files_included": [
+            "vuln.c"
+          ],
+          "original_length": 174,
+          "enhanced_length": 946
+        },
+        "dependencies": [],
+        "dependency_metadata": {
+          "depth": 3,
+          "total_upstream": 1,
+          "total_downstream": 0,
+          "direct_calls": 1,
+          "direct_callers": 0
+        }
+      },
+      "ground_truth": {
+        "status": "UNKNOWN",
+        "vulnerability_types": [],
+        "issues": [],
+        "annotation_source": null,
+        "annotation_key": null,
+        "notes": null
+      },
+      "metadata": {
+        "is_static": false,
+        "is_exported": true,
+        "return_type": "int",
+        "parameters": [
+          "int argc",
+          "char *argv[]"
+        ],
+        "generator": "c_unit_generator.py",
+        "direct_calls": [
+          "vuln.c:check_password"
+        ],
+        "direct_callers": []
+      },
+      "agent_context": {
+        "include_functions": [
+          {
+            "id": "vuln.c:main",
+            "reason": "Entry point that receives command-line arguments and passes them directly to vulnerable function"
+          },
+          {
+            "id": "vuln.c:check_password",
+            "reason": "Contains the exploitable buffer overflow via strcpy with unbounded user input"
+          }
+        ],
+        "usage_context": "This is a command-line program that accepts a password as a command-line argument (argv[1]). The main function passes this user-controlled input directly to check_password(), which uses strcpy() to copy it into a fixed 16-byte buffer without bounds checking. This creates a direct path from user input to a memory corruption vulnerability.",
+        "security_classification": "exploitable",
+        "classification_reasoning": "This code contains a classic buffer overflow vulnerability that is directly exploitable by users. The check_password() function uses strcpy() to copy user input into a 16-byte buffer without any length validation. The user input comes from command-line arguments (argv[1]) in main(), which is a direct entry point for attacker-controlled data. An attacker can provide a password longer than 15 characters to overflow the buffer, potentially overwriting the 'authenticated' variable (authentication bypass) or the return address (arbitrary code execution). There is no sanitization, validation, or bounds checking between the user input and the dangerous operation. This meets all criteria for EXPLOITABLE: (1) contains a dangerous operation (unbounded strcpy), (2) is reachable from a user input source (CLI arguments), and (3) has no protective controls in place.",
+        "confidence": 1.0,
+        "agent_metadata": {
+          "iterations": 1,
+          "total_tokens": 3352,
+          "input_tokens": 2371,
+          "output_tokens": 981,
+          "cost_usd": 0.021828
+        },
+        "reachability": {
+          "is_entry_point": false,
+          "reachable_from_entry": null,
+          "entry_point_path": null
+        }
+      }
+    }
+  ],
+  "statistics": {
+    "total_units": 2,
+    "by_type": {
+      "function": 1,
+      "main": 1
+    },
+    "units_with_upstream": 1,
+    "units_with_downstream": 1,
+    "units_enhanced": 2,
+    "avg_upstream": 0.5,
+    "avg_downstream": 0.5
+  },
+  "metadata": {
+    "generator": "c_unit_generator.py",
+    "generated_at": "2026-06-17T07:22:12.036010",
+    "dependency_depth": 3,
+    "agentic_enhanced": true,
+    "enhancement_mode": "agentic",
+    "agentic_stats": {
+      "units_processed": 2,
+      "units_with_context": 2,
+      "total_iterations": 2,
+      "functions_added": 4,
+      "security_controls_found": 0,
+      "exploitable_found": 2,
+      "vulnerable_found": 0,
+      "neutral_found": 0,
+      "errors": 0,
+      "error_summary": {}
+    },
+    "token_usage": {
+      "total_calls": 2,
+      "total_input_tokens": 4742,
+      "total_output_tokens": 1955,
+      "total_tokens": 6697,
+      "total_cost_usd": 0.043551
+    }
+  }
+}

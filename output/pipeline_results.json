@@ -1,0 +1,24 @@
+{
+  "repository": "/work/input",
+  "test_time": "2026-06-17T07:22:12.034423",
+  "processing_level": "all",
+  "success": true,
+  "stages": {
+    "c_parser": {
+      "success": true,
+      "elapsed_seconds": 0.002055,
+      "output_file": "/work/output/dataset.json",
+      "summary": {
+        "total_files": 1,
+        "total_functions": 2,
+        "total_units": 2,
+        "by_type": {
+          "function": 1,
+          "main": 1
+        },
+        "call_graph_edges": 1,
+        "avg_out_degree": 0.5
+      }
+    }
+  }
+}

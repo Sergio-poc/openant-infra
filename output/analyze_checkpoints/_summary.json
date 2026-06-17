@@ -1,0 +1,14 @@
+{
+  "step": "Analyze",
+  "phase": "done",
+  "timestamp": "2026-06-17T08:23:59.061037Z",
+  "total_units": 2,
+  "completed": 2,
+  "errors": 0,
+  "error_breakdown": {},
+  "usage": {
+    "input_tokens": 2610,
+    "output_tokens": 1958,
+    "cost_usd": 0.0372
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "dataset": "",
+  "model": "",
+  "timestamp": "",
+  "verify": true,
+  "metrics": {
+    "total": 0,
+    "vulnerable": 0,
+    "bypassable": 0,
+    "inconclusive": 0,
+    "protected": 0,
+    "safe": 0,
+    "errors": 0
+  },
+  "results": [],
+  "confirmed_findings": []
+}

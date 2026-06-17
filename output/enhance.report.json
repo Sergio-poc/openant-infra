@@ -1,0 +1,30 @@
+{
+  "step": "enhance",
+  "status": "success",
+  "timestamp": "2026-06-17T07:46:36.576497Z",
+  "duration_seconds": 17.76,
+  "cost_usd": 0.043551,
+  "token_usage": {
+    "input_tokens": 4742,
+    "output_tokens": 1955,
+    "total_tokens": 6697
+  },
+  "summary": {
+    "units_enhanced": 2,
+    "error_count": 0,
+    "classifications": {
+      "exploitable": 2
+    },
+    "mode": "agentic"
+  },
+  "inputs": {
+    "dataset_path": "/work/output/dataset.json",
+    "analyzer_output_path": "/work/output/analyzer_output.json",
+    "repo_path": null,
+    "mode": "agentic"
+  },
+  "outputs": {
+    "enhanced_dataset_path": "/work/output/dataset.json"
+  },
+  "errors": []
+}
