@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "openant": {
+      "command": "python3",
+      "args": ["tools/mcp-server/server.py"],
+      "env": {
+        "AWS_REGION": "eu-west-1",
+        "INFRA_DIR": "./infra/terraform"
+      }
+    }
+  }
+}
