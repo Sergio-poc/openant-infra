@@ -1,23 +1,15 @@
 output "bucket_name" {
-  value = aws_s3_bucket.data.id
+  value = google_storage_bucket.data.name
 }
 
-output "ecr_repository_url" {
-  value = aws_ecr_repository.agent.repository_url
+output "artifact_registry_url" {
+  value = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.agent.repository_id}"
 }
 
-output "ecs_cluster_name" {
-  value = aws_ecs_cluster.main.name
+output "cloud_run_service_url" {
+  value = google_cloud_run_v2_service.agent.uri
 }
 
-output "task_definition_arn" {
-  value = aws_ecs_task_definition.agent.arn
-}
-
-output "subnet_id" {
-  value = data.aws_subnets.public.ids[0]
-}
-
-output "security_group_id" {
-  value = data.aws_security_group.default.id
+output "service_account_email" {
+  value = google_service_account.agent.email
 }

@@ -1,6 +1,11 @@
-variable "aws_region" {
+variable "project_id" {
+  type        = string
+  description = "GCP project ID"
+}
+
+variable "region" {
   type    = string
-  default = "eu-west-1"
+  default = "europe-west1"
 }
 
 variable "project_name" {
@@ -14,11 +19,11 @@ variable "default_model_id" {
 }
 
 variable "task_cpu" {
-  type    = number
-  default = 4096
+  type    = string
+  default = "4"
 }
 
 variable "task_memory" {
-  type    = number
-  default = 8192
+  type    = string
+  default = "8Gi"
 }

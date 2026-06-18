@@ -2,133 +2,95 @@ locals {
   name = var.project_name
 }
 
-# ─── S3 Bucket ────────────────────────────────────────────────────────────────
+# ─── Random suffix for unique naming ─────────────────────────────────────────
 
-resource "aws_s3_bucket" "data" {
-  bucket_prefix = "${local.name}-data-"
-  force_destroy = true
+resource "random_id" "suffix" {
+  byte_length = 4
 }
 
-resource "aws_s3_bucket_versioning" "data" {
-  bucket = aws_s3_bucket.data.id
-  versioning_configuration { status = "Enabled" }
-}
+# ─── GCS Bucket ───────────────────────────────────────────────────────────────
 
-# ─── Networking (use existing default VPC) ────────────────────────────────────
+resource "google_storage_bucket" "data" {
+  name                        = "${local.name}-data-${random_id.suffix.hex}"
+  location                    = var.region
+  force_destroy               = true
+  uniform_bucket_level_access = true
 
-data "aws_vpc" "default" {
-  default = true
-}
-
-data "aws_subnets" "public" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
-  }
-  filter {
-    name   = "map-public-ip-on-launch"
-    values = ["true"]
+  versioning {
+    enabled = true
   }
 }
 
-data "aws_security_group" "default" {
-  vpc_id = data.aws_vpc.default.id
-  name   = "default"
+# ─── Artifact Registry ────────────────────────────────────────────────────────
+
+resource "google_artifact_registry_repository" "agent" {
+  location      = var.region
+  repository_id = "${local.name}-agent"
+  format        = "DOCKER"
 }
 
-# ─── IAM ──────────────────────────────────────────────────────────────────────
+# ─── Service Account + IAM ────────────────────────────────────────────────────
 
-data "aws_iam_policy_document" "ecs_assume" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["ecs-tasks.amazonaws.com"]
-    }
-  }
+resource "google_service_account" "agent" {
+  account_id   = "${local.name}-agent"
+  display_name = "${local.name} Agent"
 }
 
-resource "aws_iam_role" "execution" {
-  name_prefix        = "${local.name}-exec-"
-  assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
+resource "google_project_iam_member" "vertex_ai" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.agent.email}"
 }
 
-resource "aws_iam_role_policy_attachment" "execution" {
-  role       = aws_iam_role.execution.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+resource "google_project_iam_member" "storage" {
+  project = var.project_id
+  role    = "roles/storage.objectAdmin"
+  member  = "serviceAccount:${google_service_account.agent.email}"
 }
 
-resource "aws_iam_role" "task" {
-  name_prefix        = "${local.name}-task-"
-  assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
-}
+# ─── Cloud Run Service ────────────────────────────────────────────────────────
 
-data "aws_iam_policy_document" "task" {
-  statement {
-    actions   = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
-    resources = ["*"]
-  }
-  statement {
-    actions   = ["bedrock:GetInferenceProfile", "bedrock:ListInferenceProfiles"]
-    resources = ["*"]
-  }
-  statement {
-    actions   = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
-    resources = [aws_s3_bucket.data.arn, "${aws_s3_bucket.data.arn}/*"]
-  }
-}
+resource "google_cloud_run_v2_service" "agent" {
+  name     = "${local.name}-agent"
+  location = var.region
 
-resource "aws_iam_role_policy" "task" {
-  name_prefix = "${local.name}-task-"
-  role        = aws_iam_role.task.id
-  policy      = data.aws_iam_policy_document.task.json
-}
+  template {
+    service_account = google_service_account.agent.email
 
-# ─── ECR ──────────────────────────────────────────────────────────────────────
+    containers {
+      image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.agent.repository_id}/agent:latest"
 
-resource "aws_ecr_repository" "agent" {
-  name         = "${local.name}-agent"
-  force_delete = true
-}
+      resources {
+        limits = {
+          cpu    = var.task_cpu
+          memory = var.task_memory
+        }
+      }
 
-# ─── ECS ──────────────────────────────────────────────────────────────────────
-
-resource "aws_ecs_cluster" "main" {
-  name = local.name
-}
-
-resource "aws_cloudwatch_log_group" "agent" {
-  name              = "/ecs/${local.name}"
-  retention_in_days = 7
-}
-
-resource "aws_ecs_task_definition" "agent" {
-  family                   = "${local.name}-agent"
-  requires_compatibilities = ["FARGATE"]
-  network_mode             = "awsvpc"
-  cpu                      = var.task_cpu
-  memory                   = var.task_memory
-  execution_role_arn       = aws_iam_role.execution.arn
-  task_role_arn            = aws_iam_role.task.arn
-
-  container_definitions = jsonencode([{
-    name      = "agent"
-    image     = "${aws_ecr_repository.agent.repository_url}:latest"
-    essential = true
-    environment = [
-      { name = "S3_BUCKET", value = aws_s3_bucket.data.id },
-      { name = "MODEL_ID", value = var.default_model_id },
-      { name = "USE_BEDROCK", value = "1" },
-      { name = "AWS_REGION", value = var.aws_region },
-      { name = "STAGE", value = "parse" },
-    ]
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = aws_cloudwatch_log_group.agent.name
-        "awslogs-region"        = var.aws_region
-        "awslogs-stream-prefix" = "agent"
+      env {
+        name  = "GCS_BUCKET"
+        value = google_storage_bucket.data.name
+      }
+      env {
+        name  = "MODEL_ID"
+        value = var.default_model_id
+      }
+      env {
+        name  = "USE_VERTEX_AI"
+        value = "1"
+      }
+      env {
+        name  = "GCP_REGION"
+        value = var.region
+      }
+      env {
+        name  = "GCP_PROJECT"
+        value = var.project_id
+      }
+      env {
+        name  = "STAGE"
+        value = "parse"
       }
     }
-  }])
+  }
 }
