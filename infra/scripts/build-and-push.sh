@@ -1,34 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REGION="eu-west-1"
 JSON_OUTPUT=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --json) JSON_OUTPUT=true; shift;;
-    --region) REGION="$2"; shift 2;;
-    *) REGION="$1"; shift;;
+    *) echo "Unknown option: $1"; exit 1;;
   esac
 done
 
 START_TIME=$(date +%s)
 
 INFRA_DIR="$(cd "$(dirname "$0")/../terraform" && pwd)"
-ECR_URL=$(terraform -chdir="$INFRA_DIR" output -raw ecr_repository_url)
-ACCOUNT=$(echo "$ECR_URL" | cut -d'.' -f1)
+REGISTRY_URL=$(terraform -chdir="$INFRA_DIR" output -raw artifact_registry_url)
+REGION=$(echo "$REGISTRY_URL" | cut -d'-' -f1-2)
 
-# Login
-$JSON_OUTPUT || echo "==> Logging in to ECR..."
-aws ecr get-login-password --region "$REGION" | \
-  docker login --username AWS --password-stdin "${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com" >/dev/null 2>&1 || {
-    if $JSON_OUTPUT; then
-      echo "{\"success\":false,\"error\":\"ECR login failed\",\"stage\":\"login\"}"
-    else
-      echo "ERROR: ECR login failed"
-    fi
-    exit 1
-  }
+# Login to Artifact Registry
+$JSON_OUTPUT || echo "==> Logging in to Artifact Registry..."
+if ! gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet 2>/dev/null; then
+  if $JSON_OUTPUT; then
+    echo "{\"success\":false,\"error\":\"Artifact Registry login failed\",\"stage\":\"login\"}"
+  else
+    echo "ERROR: Artifact Registry login failed"
+  fi
+  exit 1
+fi
 
 # Build
 DOCKER_DIR="$(cd "$(dirname "$0")/../docker" && pwd)"
@@ -45,9 +42,10 @@ if ! docker build --platform linux/amd64 -t openant-agent -f "${DOCKER_DIR}/Dock
 fi
 
 # Push
-$JSON_OUTPUT || echo "==> Pushing to ${ECR_URL}:latest"
-docker tag openant-agent:latest "${ECR_URL}:latest"
-if ! docker push "${ECR_URL}:latest" >/dev/null 2>&1; then
+IMAGE="${REGISTRY_URL}/agent:latest"
+$JSON_OUTPUT || echo "==> Pushing to ${IMAGE}"
+docker tag openant-agent:latest "$IMAGE"
+if ! docker push "$IMAGE" >/dev/null 2>&1; then
   if $JSON_OUTPUT; then
     echo "{\"success\":false,\"error\":\"Docker push failed\",\"stage\":\"push\"}"
   else
@@ -57,14 +55,14 @@ if ! docker push "${ECR_URL}:latest" >/dev/null 2>&1; then
 fi
 
 # Get digest
-DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "${ECR_URL}:latest" 2>/dev/null | cut -d'@' -f2 || echo "unknown")
+DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" 2>/dev/null | cut -d'@' -f2 || echo "unknown")
 
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
 
 if $JSON_OUTPUT; then
   cat <<EOF
-{"success":true,"ecr_url":"${ECR_URL}:latest","digest":"${DIGEST}","duration_seconds":${DURATION}}
+{"success":true,"image":"${IMAGE}","digest":"${DIGEST}","duration_seconds":${DURATION}}
 EOF
 else
   echo "==> Done. Duration: ${DURATION}s | Digest: ${DIGEST}"

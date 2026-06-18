@@ -5,7 +5,7 @@ usage() {
   cat <<EOF
 Usage: $0 --project <org/repo> [options]
 
-Launch an OpenAnt pipeline step on ECS Fargate.
+Launch an OpenAnt pipeline step on Cloud Run.
 
 Options:
   --project    Project path org/repo (required)
@@ -14,13 +14,13 @@ Options:
   --pipeline   Comma-separated stages to run sequentially (e.g. parse,enhance,analyze,verify)
   --from-run   Previous run ID to resume from (default: latest)
   --model      Model ID (default: claude-sonnet-4-20250514)
-  --region     AWS region (default: eu-west-1)
+  --region     GCP region (default: europe-west1)
   --help       Show this help
 EOF
   exit 0
 }
 
-PROJECT="" CODE_PATH="" STAGE="parse" FROM_RUN="" MODEL="" REGION="eu-west-1" PIPELINE=""
+PROJECT="" CODE_PATH="" STAGE="parse" FROM_RUN="" MODEL="" REGION="europe-west1" PIPELINE=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -42,10 +42,7 @@ done
 # Resolve Terraform outputs
 INFRA_DIR="$(cd "$(dirname "$0")/../terraform" && pwd)"
 BUCKET=$(terraform -chdir="$INFRA_DIR" output -raw bucket_name)
-CLUSTER=$(terraform -chdir="$INFRA_DIR" output -raw ecs_cluster_name)
-TASK_DEF=$(terraform -chdir="$INFRA_DIR" output -raw task_definition_arn)
-SUBNET=$(terraform -chdir="$INFRA_DIR" output -raw subnet_id)
-SG=$(terraform -chdir="$INFRA_DIR" output -raw security_group_id)
+SERVICE_URL=$(terraform -chdir="$INFRA_DIR" output -raw cloud_run_service_url)
 
 RUN_ID="run-$(date +%Y%m%dT%H%M%S)-$(openssl rand -hex 4)"
 
@@ -58,55 +55,51 @@ run_stage() {
 
   # Find latest run if needed
   if [[ "$STAGE_NAME" != "parse" && -z "$STAGE_FROM_RUN" ]]; then
-    STAGE_FROM_RUN=$(aws s3 ls "s3://${BUCKET}/projects/${PROJECT}/" --region "$REGION" | \
-      grep 'PRE run-' | awk '{print $2}' | tr -d '/' | sort | tail -1)
+    STAGE_FROM_RUN=$(gsutil ls "gs://${BUCKET}/projects/${PROJECT}/" 2>/dev/null | \
+      grep -o 'run-[^/]*' | sort | tail -1)
     [[ -z "$STAGE_FROM_RUN" ]] && { echo "Error: no previous run found."; return 1; }
   fi
 
   # Upload code if parse and code_path provided
   if [[ "$STAGE_NAME" == "parse" && -n "$CODE_PATH" ]]; then
-    echo "==> Uploading code to s3://${BUCKET}/projects/${PROJECT}/${STAGE_RUN_ID}/input/"
-    aws s3 sync "$CODE_PATH" "s3://${BUCKET}/projects/${PROJECT}/${STAGE_RUN_ID}/input/" --quiet --region "$REGION"
+    echo "==> Uploading code to gs://${BUCKET}/projects/${PROJECT}/${STAGE_RUN_ID}/input/"
+    gsutil -m -q rsync -r "$CODE_PATH" "gs://${BUCKET}/projects/${PROJECT}/${STAGE_RUN_ID}/input/"
   fi
 
   # Copy previous outputs
   if [[ -n "$STAGE_FROM_RUN" && "$STAGE_FROM_RUN" != "$STAGE_RUN_ID" ]]; then
     echo "==> Copying previous outputs from ${STAGE_FROM_RUN} to ${STAGE_RUN_ID}"
-    aws s3 sync "s3://${BUCKET}/projects/${PROJECT}/${STAGE_FROM_RUN}/" \
-      "s3://${BUCKET}/projects/${PROJECT}/${STAGE_RUN_ID}/" \
-      --exclude "input/*" --quiet --region "$REGION"
+    gsutil -m -q rsync -r -x "input/.*" \
+      "gs://${BUCKET}/projects/${PROJECT}/${STAGE_FROM_RUN}/" \
+      "gs://${BUCKET}/projects/${PROJECT}/${STAGE_RUN_ID}/"
   fi
 
-  echo "==> Launching ECS task (project=${PROJECT}, run=${STAGE_RUN_ID}, stage=${STAGE_NAME})"
+  echo "==> Launching Cloud Run job (project=${PROJECT}, run=${STAGE_RUN_ID}, stage=${STAGE_NAME})"
 
-  local ENV_VARS="[{\"name\":\"PROJECT_PATH\",\"value\":\"${PROJECT}\"},{\"name\":\"RUN_ID\",\"value\":\"${STAGE_RUN_ID}\"},{\"name\":\"STAGE\",\"value\":\"${STAGE_NAME}\"}"
-  [ -n "$MODEL" ] && ENV_VARS="${ENV_VARS},{\"name\":\"MODEL_ID\",\"value\":\"${MODEL}\"}"
-  ENV_VARS="${ENV_VARS}]"
+  local ENV_VARS="PROJECT_PATH=${PROJECT},RUN_ID=${STAGE_RUN_ID},STAGE=${STAGE_NAME},GCS_BUCKET=${BUCKET}"
+  [[ -n "$MODEL" ]] && ENV_VARS="${ENV_VARS},MODEL_ID=${MODEL}"
 
-  local OVERRIDES="{\"containerOverrides\":[{\"name\":\"agent\",\"environment\":${ENV_VARS}}]}"
+  # Invoke Cloud Run service
+  local RESPONSE
+  RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${SERVICE_URL}" \
+    -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+    -H "Content-Type: application/json" \
+    -d "{\"project_path\":\"${PROJECT}\",\"run_id\":\"${STAGE_RUN_ID}\",\"stage\":\"${STAGE_NAME}\",\"model_id\":\"${MODEL:-}\"}")
 
-  local TASK_ARN=$(aws ecs run-task \
-    --region "$REGION" --cluster "$CLUSTER" --task-definition "$TASK_DEF" \
-    --launch-type FARGATE \
-    --network-configuration "awsvpcConfiguration={subnets=[$SUBNET],securityGroups=[$SG],assignPublicIp=ENABLED}" \
-    --overrides "$OVERRIDES" \
-    --query 'tasks[0].taskArn' --output text)
-
-  echo "==> Task: ${TASK_ARN}"
-
-  # Wait
-  aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$TASK_ARN" --region "$REGION"
-
-  local EXIT_CODE=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK_ARN" --region "$REGION" \
-    --query 'tasks[0].containers[0].exitCode' --output text)
+  local HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+  local BODY=$(echo "$RESPONSE" | sed '$d')
 
   local STAGE_END=$(date +%s)
   local DURATION=$((STAGE_END - STAGE_START))
 
-  echo "==> ${STAGE_NAME}: exit_code=${EXIT_CODE} duration=${DURATION}s"
-
-  [[ "$EXIT_CODE" != "0" ]] && return 1
-  return 0
+  if [[ "$HTTP_CODE" -ge 200 && "$HTTP_CODE" -lt 300 ]]; then
+    echo "==> ${STAGE_NAME}: success (HTTP ${HTTP_CODE}) duration=${DURATION}s"
+    return 0
+  else
+    echo "==> ${STAGE_NAME}: failed (HTTP ${HTTP_CODE}) duration=${DURATION}s"
+    echo "    Response: ${BODY}"
+    return 1
+  fi
 }
 
 # --- Pipeline mode ---
@@ -121,7 +114,7 @@ if [[ -n "$PIPELINE" ]]; then
     run_stage "$PSTAGE" "$CURRENT_RUN" "$FROM_RUN" || {
       echo ""
       echo "❌ Pipeline failed at stage: ${PSTAGE}"
-      echo "==> Results so far: s3://${BUCKET}/projects/${PROJECT}/${CURRENT_RUN}/"
+      echo "==> Results so far: gs://${BUCKET}/projects/${PROJECT}/${CURRENT_RUN}/"
       exit 1
     }
     FROM_RUN="$CURRENT_RUN"
@@ -131,15 +124,15 @@ if [[ -n "$PIPELINE" ]]; then
   PIPELINE_END=$(date +%s)
   echo "✅ Pipeline complete in $((PIPELINE_END - PIPELINE_START))s"
   echo "==> Run ID: ${CURRENT_RUN}"
-  echo "==> Results: s3://${BUCKET}/projects/${PROJECT}/${CURRENT_RUN}/"
+  echo "==> Results: gs://${BUCKET}/projects/${PROJECT}/${CURRENT_RUN}/"
   exit 0
 fi
 
-# --- Single stage mode (original behavior) ---
+# --- Single stage mode ---
 if [[ "$STAGE" != "parse" && -z "$FROM_RUN" ]]; then
   echo "==> Finding latest run for project: ${PROJECT}"
-  FROM_RUN=$(aws s3 ls "s3://${BUCKET}/projects/${PROJECT}/" --region "$REGION" | \
-    grep 'PRE run-' | awk '{print $2}' | tr -d '/' | sort | tail -1)
+  FROM_RUN=$(gsutil ls "gs://${BUCKET}/projects/${PROJECT}/" 2>/dev/null | \
+    grep -o 'run-[^/]*' | sort | tail -1)
   if [[ -z "$FROM_RUN" ]]; then
     echo "Error: no previous run found. Run parse first."
     exit 1
@@ -151,5 +144,5 @@ run_stage "$STAGE" "$RUN_ID" "$FROM_RUN"
 
 echo ""
 echo "==> Run ID: ${RUN_ID}"
-echo "==> Results: s3://${BUCKET}/projects/${PROJECT}/${RUN_ID}/"
-echo "==> Logs: aws logs tail /ecs/openant --follow"
+echo "==> Results: gs://${BUCKET}/projects/${PROJECT}/${RUN_ID}/"
+echo "==> Logs: gcloud logging read 'resource.type=cloud_run_revision' --limit 50"
