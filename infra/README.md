@@ -1,140 +1,144 @@
-# OpenAnt — ECS Fargate Infrastructure
+# OpenAnt — Cloud Run Infrastructure (GCP)
 
-Déploiement du pipeline OpenAnt (`parse → enhance → analyze → verify → build-output → report`) sur AWS ECS Fargate avec output S3 par step et exécution indépendante de chaque étape.
+Deploys the OpenAnt pipeline (`parse → enhance → analyze → verify → build-output → report`) on GCP Cloud Run with GCS storage per step and Vertex AI for LLM calls.
 
 ## Architecture
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
-│  run.sh     │────▶│  ECS Fargate │────▶│  S3 Bucket      │
-│  (local)    │     │  (task)      │     │  results/step   │
+│  run.sh     │────▶│  Cloud Run   │────▶│  GCS Bucket     │
+│  (local)    │     │  (service)   │     │  results/step   │
 └─────────────┘     └──────┬───────┘     └─────────────────┘
                            │
                            ▼
                     ┌──────────────┐
-                    │  Bedrock /   │
                     │  Vertex AI   │
+                    │  (Claude)    │
                     └──────────────┘
 ```
 
-### Structure S3
+### GCS layout
 
 ```
-s3://<bucket>/projects/<org>/<repo>/<run-id>/
-├── input/              # Code source uploadé
-├── parse/              # Résultats du parsing
-├── enhance/            # Contexte enrichi
-├── analyze/            # Vulnérabilités détectées
-├── verify/             # Vérification attaquant (Stage 2)
+gs://<bucket>/projects/<org>/<repo>/<run-id>/
+├── input/              # Uploaded source code
+├── parse/              # Parsing results
+├── enhance/            # Enriched security context
+├── analyze/            # Detected vulnerabilities
+├── verify/             # Attacker verification (Stage 2)
 ├── build-output/       # pipeline_output.json
-└── report/             # Rapport final
+└── report/             # Final report
 ```
 
-## Prérequis
+## Prerequisites
 
-- AWS CLI configuré
+- `gcloud` CLI configured (`gcloud auth login` + `gcloud auth application-default login`)
 - Terraform >= 1.5
 - Docker
-- Accès à Amazon Bedrock (modèles Claude activés dans la région)
+- Vertex AI enabled on the GCP project (Claude models available)
 
-## Déploiement
+## Deployment
 
 ```bash
-# 1. Provisionner l'infra
+# 1. Provision infrastructure
 cd infra/terraform
 terraform init
-terraform apply
+terraform apply -var="project_id=<your-gcp-project>"
 
-# 2. Build et push de l'image Docker
+# 2. Build and push the Docker image
 ./infra/scripts/build-and-push.sh
 ```
 
 ## Usage
 
-### Lancer un scan complet (step par step)
+### Run a full scan (step by step)
 
 ```bash
-# Parse (upload le code + lance le parsing)
+# Parse (uploads code + runs parsing)
 ./infra/scripts/run.sh --project myorg/myrepo --code ./path/to/code --stage parse
 
-# Enhance (ajoute le contexte de sécurité via LLM)
+# Enhance (adds security context via LLM)
 ./infra/scripts/run.sh --project myorg/myrepo --stage enhance
 
-# Analyze (détection de vulnérabilités — Stage 1)
+# Analyze (vulnerability detection — Stage 1)
 ./infra/scripts/run.sh --project myorg/myrepo --stage analyze
 
-# Verify (simulation d'attaque — Stage 2)
+# Verify (attack simulation — Stage 2)
 ./infra/scripts/run.sh --project myorg/myrepo --stage verify
 
-# Build output (génère pipeline_output.json)
+# Build output (generates pipeline_output.json)
 ./infra/scripts/run.sh --project myorg/myrepo --stage build-output
 
-# Report (rapport final)
+# Report (final report)
 ./infra/scripts/run.sh --project myorg/myrepo --stage report
 ```
 
-### Reprendre depuis un run spécifique
+### Multi-stage pipeline
+
+```bash
+./infra/scripts/run.sh --project myorg/myrepo --code ./path/to/code \
+  --pipeline parse,enhance,analyze,verify
+```
+
+### Resume from a specific run
 
 ```bash
 ./infra/scripts/run.sh --project myorg/myrepo --stage verify --from-run run-20260616T120000-abcd1234
 ```
 
-### Télécharger les résultats
+### Download results
 
 ```bash
-# Attend la fin du task + download
 ./infra/scripts/download.sh --project myorg/myrepo --run-id run-20260616T120000-abcd1234
-
-# Avec task ARN (skip la recherche)
-./infra/scripts/download.sh --project myorg/myrepo --run-id run-xxx --task-arn arn:aws:ecs:...
 ```
 
-### Suivre les logs
+### View logs
 
 ```bash
-aws logs tail /ecs/openant --follow
+gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=openant-agent" --limit 50 --format="value(textPayload)"
 ```
 
-## Configuration LLM
+## LLM configuration
 
-Le client LLM supporte 3 backends via variables d'environnement :
+The LLM client supports 3 backends via environment variables:
 
 | Backend | Env vars | Auth |
 |---------|----------|------|
-| **Bedrock** (défaut) | `USE_BEDROCK=1`, `AWS_REGION` | IAM role du task ECS |
-| **Vertex AI** | `USE_VERTEX=1`, `VERTEX_REGION`, `VERTEX_PROJECT_ID` | Service account GCP |
-| **API directe** | `ANTHROPIC_API_KEY` | Clé API |
+| **Vertex AI** (default) | `USE_VERTEX_AI=1`, `GCP_REGION`, `GCP_PROJECT` | GCP service account |
+| **Bedrock** | `USE_BEDROCK=1`, `AWS_REGION` | IAM role |
+| **Direct API** | `ANTHROPIC_API_KEY` | API key |
 
-Pour changer de modèle :
+To change the model:
 
 ```bash
 ./infra/scripts/run.sh --project myorg/myrepo --stage analyze --model claude-opus-4-20250514
 ```
 
-## Structure du projet
+## Project structure
 
 ```
 infra/
 ├── docker/
-│   ├── Dockerfile          # Image Python 3.11 + AWS CLI + openant-core
-│   └── entrypoint.sh       # Orchestration : S3 sync → run step → upload
+│   ├── Dockerfile          # Python 3.11 + gcloud CLI + openant-core
+│   └── entrypoint.sh       # Orchestration: GCS sync → run step → upload
 ├── terraform/
-│   ├── providers.tf
-│   ├── variables.tf        # region, model, cpu/memory
-│   ├── main.tf             # S3, ECR, ECS, IAM (Bedrock + S3)
+│   ├── providers.tf        # Google provider
+│   ├── variables.tf        # project_id, region, model, cpu/memory
+│   ├── main.tf             # GCS, Artifact Registry, Cloud Run, IAM (Vertex AI + GCS)
 │   └── outputs.tf
 └── scripts/
-    ├── run.sh              # Lance un step sur ECS Fargate
-    ├── download.sh         # Attend + télécharge les résultats
-    └── build-and-push.sh   # Build image → push ECR
+    ├── run.sh              # Launches a step on Cloud Run
+    ├── download.sh         # Downloads results from GCS
+    └── build-and-push.sh   # Builds image → pushes to Artifact Registry
 ```
 
-## Variables Terraform
+## Terraform variables
 
-| Variable | Défaut | Description |
-|----------|--------|-------------|
-| `aws_region` | `eu-west-1` | Région AWS |
-| `project_name` | `openant` | Préfixe des ressources |
-| `default_model_id` | `claude-sonnet-4-20250514` | Modèle par défaut |
-| `task_cpu` | `4096` | CPU du task (vCPU × 1024) |
-| `task_memory` | `8192` | Mémoire du task (MB) |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `project_id` | — | GCP project ID (required) |
+| `region` | `europe-west1` | GCP region |
+| `project_name` | `openant` | Resource name prefix |
+| `default_model_id` | `claude-sonnet-4-20250514` | Default model |
+| `task_cpu` | `4` | CPU (vCPUs) |
+| `task_memory` | `8Gi` | Memory |
